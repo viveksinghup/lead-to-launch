@@ -1,0 +1,23 @@
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Env secrets — never commit
+.env
+.env.*
+!app/.env.local.example
+
+# Node
+node_modules/
+**/node_modules/
+
+# Next.js build output
+app/.next/
+app/out/
+
+# Vercel
+.vercel/
+
+# Editor
+.vscode/
+*.swp

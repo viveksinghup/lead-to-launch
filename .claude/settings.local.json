@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm -v)",
+      "Bash(npx --yes create-next-app@latest app --typescript --tailwind --app --no-src-dir --turbopack --import-alias \"@/*\" --use-npm --eslint)",
+      "Bash(npx --yes shadcn@latest init -y -d)",
+      "Bash(npx --yes shadcn@latest add card table progress badge tabs input dialog sonner separator skeleton textarea select switch -y)",
+      "Bash(npm i *)",
+      "Bash(python3 -c ' *)",
+      "Bash(sed -i '' 's/^Shashwat`,/[Your Name]`,/' components/Phase5Outreach.tsx)",
+      "Bash(sed -i '' 's/Aapki clinic ke liye ek website demo banayi hai/Aapke business ke liye ek website demo banayi hai/; s/Built a website demo for your clinic/Built a website demo for your business/' components/Phase5Outreach.tsx)",
+      "Bash(npx tsc *)",
+      "Bash(echo \"tsc exit: $?\")"
+    ]
+  }
+}
