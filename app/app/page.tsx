@@ -7,6 +7,7 @@ import { Phase2Audit } from "@/components/Phase2Audit";
 import { Phase3Rank } from "@/components/Phase3Rank";
 import { Phase4Build } from "@/components/Phase4Build";
 import { Phase5Outreach } from "@/components/Phase5Outreach";
+import { ApiKeysModal } from "@/components/ApiKeysModal";
 import type { Lead, AuditResult, RankedLead } from "@/lib/types";
 import { Sparkles } from "lucide-react";
 
@@ -59,7 +60,17 @@ export default function Page() {
               <div className="text-[11px] text-muted-foreground leading-tight tracking-wide uppercase mt-1">Scrape · Audit · Rank · Build · Outreach</div>
             </div>
           </div>
-          <EngineBadge info={engineInfo} />
+          <div className="flex items-center gap-3">
+            <ApiKeysModal
+              onKeysChanged={() => {
+                fetch("/api/claude-status")
+                  .then((r) => r.json())
+                  .then((d) => setEngineInfo({ installed: !!d.installed, label: d.label }))
+                  .catch(() => setEngineInfo({ installed: true, label: "100% Free Engine Active" }));
+              }}
+            />
+            <EngineBadge info={engineInfo} />
+          </div>
         </div>
         <Stepper current={phase} completed={completed} onJump={(n) => setPhase(n)} />
       </header>

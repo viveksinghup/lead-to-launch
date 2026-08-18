@@ -63,6 +63,8 @@ export type ScrapeInput = {
   niche: string;
   city: string;
   count: number;
+  serpApiKey?: string;
+  geminiApiKey?: string;
 };
 
 export type OutreachChannel = "whatsapp" | "email" | "instagram";

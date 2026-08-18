@@ -41,12 +41,14 @@ ${JSON.stringify(slim, null, 2)}`;
 
 export async function POST(req: Request) {
   try {
-    const { leads } = (await req.json()) as { leads: Lead[] };
+    const body = (await req.json()) as { leads: Lead[]; geminiApiKey?: string };
+    const { leads } = body;
+    const geminiApiKey = body.geminiApiKey || req.headers.get("x-gemini-key") || undefined;
     if (!Array.isArray(leads) || leads.length === 0) {
       return NextResponse.json({ error: "No leads provided." }, { status: 400 });
     }
 
-    const audits = await executeAudit(leads, buildPrompt(leads));
+    const audits = await executeAudit(leads, buildPrompt(leads), geminiApiKey);
     return NextResponse.json({ source: "engine", audits });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });

@@ -39,11 +39,14 @@ Return ONLY this JSON (no markdown fences):
 
 export async function POST(req: Request) {
   try {
-    const { lead, channel, language } = (await req.json()) as {
+    const body = (await req.json()) as {
       lead: RankedLead;
       channel: OutreachChannel;
       language: OutreachLanguage;
+      geminiApiKey?: string;
     };
+    const { lead, channel, language } = body;
+    const geminiApiKey = body.geminiApiKey || req.headers.get("x-gemini-key") || undefined;
     if (!lead) return NextResponse.json({ error: "No lead provided." }, { status: 400 });
 
     const result = await executeOutreach(
@@ -51,6 +54,7 @@ export async function POST(req: Request) {
       channel || "whatsapp",
       language || "hinglish",
       buildPrompt(lead, channel || "whatsapp", language || "hinglish"),
+      geminiApiKey,
     );
 
     return NextResponse.json({

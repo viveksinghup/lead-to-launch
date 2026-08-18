@@ -35,10 +35,12 @@ Return ONLY this JSON (no markdown fences):
 
 export async function POST(req: Request) {
   try {
-    const { lead, platform } = (await req.json()) as { lead: RankedLead; platform: string };
+    const body = (await req.json()) as { lead: RankedLead; platform: string; geminiApiKey?: string };
+    const { lead, platform } = body;
+    const geminiApiKey = body.geminiApiKey || req.headers.get("x-gemini-key") || undefined;
     if (!lead) return NextResponse.json({ error: "No lead provided." }, { status: 400 });
 
-    const result = await executeBuildPrompt(lead, platform || "lovable", buildPrompt(lead, platform || "lovable"));
+    const result = await executeBuildPrompt(lead, platform || "lovable", buildPrompt(lead, platform || "lovable"), geminiApiKey);
     return NextResponse.json({
       source: "engine",
       prompt: result.prompt ?? "",

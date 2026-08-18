@@ -42,16 +42,19 @@ ${JSON.stringify(rows, null, 2)}`;
 
 export async function POST(req: Request) {
   try {
-    const { leads, audits } = (await req.json()) as {
+    const body = (await req.json()) as {
       leads: Lead[];
       audits: Record<string, AuditResult>;
+      geminiApiKey?: string;
     };
+    const { leads, audits } = body;
+    const geminiApiKey = body.geminiApiKey || req.headers.get("x-gemini-key") || undefined;
     const auditable = leads.filter((l) => audits?.[l.id]);
     if (auditable.length === 0) {
       return NextResponse.json({ error: "No audited leads to rank." }, { status: 400 });
     }
 
-    const ranked = await executeRank(leads, audits, buildPrompt(leads, audits));
+    const ranked = await executeRank(leads, audits, buildPrompt(leads, audits), geminiApiKey);
     return NextResponse.json({ source: "engine", ranked });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });

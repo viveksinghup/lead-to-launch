@@ -4,10 +4,6 @@ import path from "node:path";
 import type { Lead, ScrapeInput } from "@/lib/types";
 import { generateMockLeads } from "@/lib/freeEngine";
 
-const APIFY_TOKEN = process.env.APIFY_TOKEN;
-const APIFY_ACTOR = process.env.APIFY_ACTOR ?? "compass~crawler-google-places";
-const SERPAPI_KEY = process.env.SERPAPI_API_KEY;
-
 // ─── LOAD SEED DATA ───────────────────────────────────────────────────────────
 async function loadSeed(): Promise<{ leads: Lead[] }> {
   const p = path.join(process.cwd(), "data", "leads-seed.json");
@@ -30,21 +26,25 @@ function isHighValueCategory(cat: string): boolean {
 }
 
 // ─── SERPAPI INTEGRATION (100 free searches/month) ───────────────────────────
-async function fetchViaSerpAPI(input: ScrapeInput): Promise<Lead[] | null> {
-  if (!SERPAPI_KEY) return null;
+async function fetchViaSerpAPI(input: ScrapeInput, explicitKey?: string): Promise<Lead[] | null> {
+  const apiKey = explicitKey || process.env.SERPAPI_API_KEY;
+  if (!apiKey) return null;
 
   const query = encodeURIComponent(`${input.niche} in ${input.city}`);
-  const url = `https://serpapi.com/search.json?engine=google_maps&q=${query}&type=search&api_key=${SERPAPI_KEY}&num=${input.count ?? 12}&hl=en`;
+  const url = `https://serpapi.com/search.json?engine=google_maps&q=${query}&type=search&api_key=${apiKey}&num=${input.count ?? 12}&hl=en`;
 
   try {
     const res = await fetch(url, { next: { revalidate: 0 } });
     if (!res.ok) {
-      console.error(`[SerpAPI] ${res.status} ${res.statusText}`);
+      console.error(`[SerpAPI] HTTP ${res.status} ${res.statusText}`);
       return null;
     }
     const data = await res.json();
     const places: Array<Record<string, unknown>> = data?.local_results ?? [];
-    if (!places.length) return null;
+    if (!places.length) {
+      console.warn("[SerpAPI] No local_results found for query:", `${input.niche} in ${input.city}`);
+      return null;
+    }
 
     const leads: Lead[] = places.slice(0, input.count).map((p, i) => {
       const cat = String(p.type ?? input.niche);
@@ -91,11 +91,13 @@ async function fetchViaSerpAPI(input: ScrapeInput): Promise<Lead[] | null> {
 
 // ─── APIFY INTEGRATION ────────────────────────────────────────────────────────
 async function fetchViaApify(input: ScrapeInput): Promise<Lead[] | null> {
-  if (!APIFY_TOKEN) return null;
+  const token = process.env.APIFY_TOKEN;
+  const actor = process.env.APIFY_ACTOR ?? "compass~crawler-google-places";
+  if (!token) return null;
 
   try {
     const runRes = await fetch(
-      `https://api.apify.com/v2/acts/${APIFY_ACTOR}/run-sync-get-dataset-items?token=${APIFY_TOKEN}`,
+      `https://api.apify.com/v2/acts/${actor}/run-sync-get-dataset-items?token=${token}`,
       {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -138,7 +140,6 @@ async function fetchViaApify(input: ScrapeInput): Promise<Lead[] | null> {
       };
     });
 
-    // Surface high-value leads first
     leads.sort((a, b) => {
       if (a.highValue && !b.highValue) return -1;
       if (!a.highValue && b.highValue) return 1;
@@ -155,7 +156,6 @@ async function fetchViaApify(input: ScrapeInput): Promise<Lead[] | null> {
 function isExactSeedQuery(input: ScrapeInput): boolean {
   const niche = input.niche?.trim().toLowerCase() ?? "";
   const city = input.city?.trim().toLowerCase() ?? "";
-  // Only serve seed for the exact default demo query
   return (
     (niche === "dentist" || niche === "dental clinic") &&
     (city === "bandra, mumbai" || city === "bandra west, mumbai" || city === "bandra")
@@ -165,25 +165,27 @@ function isExactSeedQuery(input: ScrapeInput): boolean {
 // ─── MAIN HANDLER ─────────────────────────────────────────────────────────────
 export async function POST(req: Request) {
   const input = (await req.json()) as ScrapeInput;
+  const headerSerpApiKey = req.headers.get("x-serpapi-key") || undefined;
+  const serpApiKey = input.serpApiKey || headerSerpApiKey || process.env.SERPAPI_API_KEY;
 
-  // 1. Live data via SerpAPI (free — 100 searches/month)
-  if (SERPAPI_KEY) {
-    const serpLeads = await fetchViaSerpAPI(input);
+  // 1. Live data via SerpAPI (free tier 100 searches/month or user-provided key)
+  if (serpApiKey) {
+    const serpLeads = await fetchViaSerpAPI(input, serpApiKey);
     if (serpLeads && serpLeads.length > 0) {
       return NextResponse.json({ source: "serpapi", leads: serpLeads });
     }
   }
 
-  // 2. Live data via Apify (paid, limited free tier)
-  if (APIFY_TOKEN) {
+  // 2. Live data via Apify
+  if (process.env.APIFY_TOKEN) {
     const apifyLeads = await fetchViaApify(input);
     if (apifyLeads && apifyLeads.length > 0) {
       return NextResponse.json({ source: "apify", leads: apifyLeads });
     }
   }
 
-  // 3. Free mode — serve curated seed for exact default query only
-  if (isExactSeedQuery(input)) {
+  // 3. Curated seed for exact default demo query (only when no live API key is set)
+  if (!serpApiKey && isExactSeedQuery(input)) {
     try {
       const { leads } = await loadSeed();
       const sliced = leads.slice(0, Math.max(1, Math.min(input.count || 12, leads.length)));

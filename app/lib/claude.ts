@@ -26,12 +26,13 @@ export function resolveClaudeBin(): string | null {
 }
 
 export function claudeInstalled(): boolean {
-  return true; // Always return true because we have the 100% Free Local Engine as active engine!
+  return true; // Free Local Engine is always available
 }
 
-export function getEngineInfo(): { mode: "claude" | "gemini" | "free-local"; label: string } {
-  if (process.env.GEMINI_API_KEY) {
-    return { mode: "gemini", label: "Gemini 2.0 Flash (Free API)" };
+export function getEngineInfo(customKey?: string): { mode: "claude" | "gemini" | "free-local"; label: string } {
+  const key = customKey || process.env.GEMINI_API_KEY;
+  if (key) {
+    return { mode: "gemini", label: "Gemini 3.7 Flash (Active)" };
   }
   const bin = resolveClaudeBin();
   if (bin) {
@@ -63,27 +64,39 @@ function extractJSON<T>(text: string): T | null {
   }
 }
 
+const GEMINI_MODELS = [
+  "gemini-3.7-flash",
+  "gemini-3.6-flash",
+  "gemini-3.5-flash",
+  "gemini-flash-latest",
+];
+
 /** Call Gemini Free API if GEMINI_API_KEY is configured */
-async function callGeminiJSON<T>(prompt: string): Promise<T | null> {
-  const apiKey = process.env.GEMINI_API_KEY;
+async function callGeminiJSON<T>(prompt: string, customApiKey?: string): Promise<T | null> {
+  const apiKey = customApiKey || process.env.GEMINI_API_KEY;
   if (!apiKey) return null;
-  try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { responseMimeType: "application/json" },
-      }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) return null;
-    return extractJSON<T>(text);
-  } catch {
-    return null;
+
+  for (const model of GEMINI_MODELS) {
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: "application/json" },
+        }),
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) continue;
+      const parsed = extractJSON<T>(text);
+      if (parsed !== null) return parsed;
+    } catch {
+      // try next model in fallback list
+    }
   }
+  return null;
 }
 
 /** Run Claude CLI as subprocess */
@@ -118,15 +131,17 @@ async function execClaudeCLI<T>(prompt: string, model = "sonnet", timeoutMs = 12
 
 /**
  * Universal JSON Runner
- * Tries Claude Code -> Gemini Free API -> Free Local Engine
+ * Tries Gemini API -> Claude Code CLI -> Free Local Engine
  */
 export async function runUniversalJSON<T>(
   prompt: string,
   fallbackValue: () => T,
+  geminiApiKey?: string,
 ): Promise<ClaudeResult<T>> {
-  // 1. Try Gemini if configured
-  if (process.env.GEMINI_API_KEY) {
-    const geminiRes = await callGeminiJSON<T>(prompt);
+  // 1. Try Gemini if configured (either via header/client param or env var)
+  const key = geminiApiKey || process.env.GEMINI_API_KEY;
+  if (key) {
+    const geminiRes = await callGeminiJSON<T>(prompt, key);
     if (geminiRes !== null) {
       return { ok: true, data: geminiRes, source: "gemini" };
     }
@@ -144,8 +159,16 @@ export async function runUniversalJSON<T>(
 }
 
 // Higher level handlers
-export async function executeAudit(leads: Lead[], rawPrompt: string): Promise<Record<string, AuditResult>> {
-  const result = await runUniversalJSON<Array<Partial<AuditResult>>>(rawPrompt, () => Object.values(auditLeadsFree(leads)));
+export async function executeAudit(
+  leads: Lead[],
+  rawPrompt: string,
+  geminiApiKey?: string,
+): Promise<Record<string, AuditResult>> {
+  const result = await runUniversalJSON<Array<Partial<AuditResult>>>(
+    rawPrompt,
+    () => Object.values(auditLeadsFree(leads)),
+    geminiApiKey,
+  );
   if (!result.ok || !Array.isArray(result.data) || result.data.length === 0) {
     return auditLeadsFree(leads);
   }
@@ -175,11 +198,17 @@ export async function executeAudit(leads: Lead[], rawPrompt: string): Promise<Re
   return audits;
 }
 
-export async function executeRank(leads: Lead[], audits: Record<string, AuditResult>, rawPrompt: string): Promise<RankedLead[]> {
+export async function executeRank(
+  leads: Lead[],
+  audits: Record<string, AuditResult>,
+  rawPrompt: string,
+  geminiApiKey?: string,
+): Promise<RankedLead[]> {
   const freeDefault = rankLeadsFree(leads, audits);
   const result = await runUniversalJSON<Array<{ leadId: string; score: number; scoreReasoning: string }>>(
     rawPrompt,
     () => freeDefault.map((r) => ({ leadId: r.id, score: r.score, scoreReasoning: r.scoreReasoning || "" })),
+    geminiApiKey,
   );
 
   if (!result.ok || !Array.isArray(result.data) || result.data.length === 0) {
@@ -203,9 +232,18 @@ export async function executeRank(leads: Lead[], audits: Record<string, AuditRes
     .sort((a, b) => b.score - a.score);
 }
 
-export async function executeBuildPrompt(lead: RankedLead, platform: string, rawPrompt: string): Promise<BuildPromptResult> {
+export async function executeBuildPrompt(
+  lead: RankedLead,
+  platform: string,
+  rawPrompt: string,
+  geminiApiKey?: string,
+): Promise<BuildPromptResult> {
   const freeDefault = buildPromptFree(lead, platform);
-  const result = await runUniversalJSON<BuildPromptResult>(rawPrompt, () => freeDefault);
+  const result = await runUniversalJSON<BuildPromptResult>(
+    rawPrompt,
+    () => freeDefault,
+    geminiApiKey,
+  );
   if (!result.ok || !result.data || !result.data.prompt) {
     return freeDefault;
   }
@@ -215,9 +253,19 @@ export async function executeBuildPrompt(lead: RankedLead, platform: string, raw
   };
 }
 
-export async function executeOutreach(lead: RankedLead, channel: OutreachChannel, language: OutreachLanguage, rawPrompt: string): Promise<OutreachResult> {
+export async function executeOutreach(
+  lead: RankedLead,
+  channel: OutreachChannel,
+  language: OutreachLanguage,
+  rawPrompt: string,
+  geminiApiKey?: string,
+): Promise<OutreachResult> {
   const freeDefault = outreachFree(lead, channel, language);
-  const result = await runUniversalJSON<OutreachResult>(rawPrompt, () => freeDefault);
+  const result = await runUniversalJSON<OutreachResult>(
+    rawPrompt,
+    () => freeDefault,
+    geminiApiKey,
+  );
   if (!result.ok || !result.data || !result.data.first) {
     return freeDefault;
   }

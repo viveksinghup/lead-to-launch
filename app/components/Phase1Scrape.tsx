@@ -11,8 +11,9 @@ import { Label } from "@/components/ui/label";
 import { PhaseShell } from "./PhaseShell";
 import {
   Loader2, MapPin, Phone, Star, Globe, MessageCircle, Mail,
-  Crown, Zap, Radio,
+  Crown, Zap, Radio, KeyRound,
 } from "lucide-react";
+import { ApiKeysModal } from "./ApiKeysModal";
 import type { Lead, ScrapeInput } from "@/lib/types";
 import { toast } from "sonner";
 
@@ -47,10 +48,14 @@ export function Phase1Scrape({
     setLeads([]);
     setSource(null);
     try {
+      const storedSerpKey = typeof window !== "undefined" ? localStorage.getItem("serpapi_key") || undefined : undefined;
+      const headers: Record<string, string> = { "content-type": "application/json" };
+      if (storedSerpKey) headers["x-serpapi-key"] = storedSerpKey;
+
       const res = await fetch("/api/scrape", {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(input),
+        headers,
+        body: JSON.stringify({ ...input, serpApiKey: storedSerpKey }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Scrape failed");
@@ -141,9 +146,18 @@ export function Phase1Scrape({
 
             {/* Source badge */}
             {sourceMeta && !loading && (
-              <div className={`flex items-center gap-2 text-[11px] font-medium px-2.5 py-1.5 rounded-md border ${sourceMeta.color}`}>
-                {sourceMeta.icon}
-                {sourceMeta.label}
+              <div className="flex items-center justify-between gap-2">
+                <div className={`flex items-center gap-2 text-[11px] font-medium px-2.5 py-1.5 rounded-md border flex-1 ${sourceMeta.color}`}>
+                  {sourceMeta.icon}
+                  {sourceMeta.label}
+                </div>
+                <ApiKeysModal
+                  trigger={
+                    <Button variant="ghost" size="sm" className="h-7 text-[10px] px-2 gap-1 text-muted-foreground hover:text-foreground">
+                      <KeyRound className="h-3 w-3" /> Configure
+                    </Button>
+                  }
+                />
               </div>
             )}
 
