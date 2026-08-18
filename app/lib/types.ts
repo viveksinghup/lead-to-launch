@@ -14,6 +14,11 @@ export type Lead = {
   lng: number;
   photosCount?: number;
   yearsInBusiness?: number;
+  /** True for high-ticket businesses (clinics, luxury salons, hotels, law firms, etc.)
+   *  that are likely to pay premium for a website — surfaced as priority leads. */
+  highValue?: boolean;
+  /** Estimated monthly revenue of the business (INR) for tiering */
+  estMonthlyRevenue?: number;
 };
 
 export type AuditResult = {
