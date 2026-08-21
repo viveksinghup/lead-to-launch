@@ -1,3 +1,4 @@
+// ─── LEAD (Google Maps / Business) ───────────────────────────────────────────
 export type Lead = {
   id: string;
   name: string;
@@ -21,6 +22,7 @@ export type Lead = {
   estMonthlyRevenue?: number;
 };
 
+// ─── AUDIT ────────────────────────────────────────────────────────────────────
 export type AuditResult = {
   leadId: string;
   pageSpeedScore: number;
@@ -34,6 +36,7 @@ export type AuditResult = {
   estLostRevenuePerMonth: number;
 };
 
+// ─── RANKED LEAD ──────────────────────────────────────────────────────────────
 export type RankedLead = Lead & {
   audit: AuditResult;
   score: number;
@@ -48,6 +51,25 @@ export type RankedLead = Lead & {
   };
 };
 
+// ─── INTENT LEAD (Option B — social/forum posts) ──────────────────────────────
+export type IntentPlatform = "twitter" | "reddit" | "linkedin" | "facebook" | "indiamart" | "justdial";
+
+export type IntentLead = {
+  id: string;
+  platform: IntentPlatform;
+  authorName: string;
+  authorHandle?: string;
+  postTitle?: string;
+  postSnippet: string;
+  postUrl: string;
+  postedAt: string; // ISO date string
+  intentScore: number; // 0–100
+  keywords: string[];
+  contactHint?: string;
+  location?: string;
+};
+
+// ─── BUILD & OUTREACH ─────────────────────────────────────────────────────────
 export type BuildPromptResult = {
   prompt: string;
   pitchPoints: string[];
@@ -59,13 +81,69 @@ export type OutreachResult = {
   bestSendTime: string;
 };
 
+// ─── SCRAPE INPUT ─────────────────────────────────────────────────────────────
+/** "find" = Option A (Google Maps), "leads" = Option B (Twitter/Reddit/LinkedIn etc.) */
+export type ScrapeMode = "find" | "leads";
+
 export type ScrapeInput = {
   niche: string;
   city: string;
   count: number;
+  mode?: ScrapeMode;
   serpApiKey?: string;
   geminiApiKey?: string;
+  twitterBearerToken?: string;
 };
 
+// ─── OUTREACH CHANNEL / LANGUAGE ─────────────────────────────────────────────
 export type OutreachChannel = "whatsapp" | "email" | "instagram";
 export type OutreachLanguage = "english" | "hinglish";
+
+// ─── CRM ─────────────────────────────────────────────────────────────────────
+export type CRMStatus =
+  | "new"
+  | "messaged"
+  | "demo_sent"
+  | "replied"
+  | "call_booked"
+  | "won"
+  | "lost";
+
+export type CRMEntry = {
+  id: string;
+  leadId: string;
+  leadName: string;
+  leadCategory: string;
+  leadCity: string;
+  leadPhone?: string;
+  leadEmail?: string;
+  leadWhatsapp?: string;
+  demoUrl?: string;
+  score?: number;
+  status: CRMStatus;
+  notes?: string;
+  outreachMessage?: string;
+  followUpMessage?: string;
+  addedAt: string;
+  lastUpdatedAt: string;
+  messagedAt?: string;
+  repliedAt?: string;
+  wonAt?: string;
+  estRevenue?: number;
+  platform?: IntentPlatform | "google_maps";
+};
+
+// ─── SETTINGS ─────────────────────────────────────────────────────────────────
+export type NotificationSettings = {
+  yourName: string;
+  yourEmail: string;
+  yourPhone?: string;
+  emailjsServiceId?: string;
+  emailjsTemplateId?: string;
+  emailjsPublicKey?: string;
+  telegramBotToken?: string;
+  telegramChatId?: string;
+  twitterBearerToken?: string;
+  defaultNiche?: string;
+  defaultCity?: string;
+};

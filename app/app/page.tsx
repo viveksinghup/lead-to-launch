@@ -7,9 +7,11 @@ import { Phase2Audit } from "@/components/Phase2Audit";
 import { Phase3Rank } from "@/components/Phase3Rank";
 import { Phase4Build } from "@/components/Phase4Build";
 import { Phase5Outreach } from "@/components/Phase5Outreach";
+import { SettingsModal } from "@/components/Settings";
 import { ApiKeysModal } from "@/components/ApiKeysModal";
 import type { Lead, AuditResult, RankedLead } from "@/lib/types";
-import { Sparkles } from "lucide-react";
+import { Sparkles, LayoutDashboard } from "lucide-react";
+import Link from "next/link";
 
 export default function Page() {
   const [phase, setPhase] = useState(1);
@@ -50,7 +52,7 @@ export default function Page() {
         Skip to content
       </a>
       <header className="border-b border-border bg-background/80 backdrop-blur sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-md bg-primary flex items-center justify-center">
               <Sparkles className="h-4 w-4 text-primary-foreground" strokeWidth={1.5} aria-hidden="true" />
@@ -60,7 +62,14 @@ export default function Page() {
               <div className="text-[11px] text-muted-foreground leading-tight tracking-wide uppercase mt-1">Scrape · Audit · Rank · Build · Outreach</div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
+            <Link href="/crm">
+              <button className="h-8 px-3 rounded-md border border-border/80 hover:border-primary/50 text-xs font-medium flex items-center gap-1.5 bg-background transition-colors">
+                <LayoutDashboard className="h-3.5 w-3.5 text-primary" />
+                <span>CRM Tracker</span>
+              </button>
+            </Link>
+            <SettingsModal />
             <ApiKeysModal
               onKeysChanged={() => {
                 fetch("/api/claude-status")

@@ -8,9 +8,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PhaseShell } from "./PhaseShell";
 import { IncompleteState } from "./IncompleteState";
 import { ClaudeThinking, ClaudeRequired } from "./ClaudeStates";
-import { Crown, IndianRupee, MessageCircle, Phone, Mail, Sparkles } from "lucide-react";
+import { Crown, IndianRupee, MessageCircle, Phone, Mail, Sparkles, Send, Bell } from "lucide-react";
 import type { Lead, AuditResult, RankedLead } from "@/lib/types";
 import { callClaude } from "@/lib/claudeClient";
+import { addToCRM } from "@/lib/crm";
+import { notifyTelegramDigest } from "@/lib/telegramNotifier";
+import { sendLeadDigestToSelf } from "@/lib/emailNotifier";
 import { toast } from "sonner";
 
 export function Phase3Rank({
@@ -33,10 +36,59 @@ export function Phase3Rank({
   onPrev: () => void;
 }) {
   const [running, setRunning] = useState(false);
+  const [notifying, setNotifying] = useState(false);
   const [notInstalled, setNotInstalled] = useState(false);
   const [claudeError, setClaudeError] = useState<string | null>(null);
 
   const auditedCount = leads.filter((l) => audits[l.id]).length;
+
+  async function notifyMe() {
+    if (ranked.length === 0) return;
+    setNotifying(true);
+    try {
+      const storedSettingsRaw = typeof window !== "undefined" ? localStorage.getItem("lead_launch_settings") : null;
+      const storedSettings = storedSettingsRaw ? JSON.parse(storedSettingsRaw) : {};
+
+      // 1. Send Telegram Notification
+      await notifyTelegramDigest(
+        ranked.slice(0, 5).map((l) => ({
+          name: l.name,
+          category: l.category,
+          city: l.city,
+          phone: l.phone,
+          email: l.email,
+          whatsapp: l.whatsapp,
+          score: l.score,
+          gap: l.audit?.biggestGap,
+          estRevenue: l.audit?.estLostRevenuePerMonth,
+        }))
+      );
+
+      // 2. Send Email Digest if configured
+      if (storedSettings.yourEmail && storedSettings.emailjsServiceId) {
+        await sendLeadDigestToSelf({
+          yourName: storedSettings.yourName || "Vivek",
+          yourEmail: storedSettings.yourEmail,
+          leads: ranked.slice(0, 5).map((l) => ({
+            name: l.name,
+            category: l.category,
+            city: l.city,
+            phone: l.phone,
+            email: l.email,
+            score: l.score,
+            pitchMessage: l.scoreReasoning || "",
+            estRevenue: l.audit?.estLostRevenuePerMonth,
+          })),
+        });
+      }
+
+      toast.success("Hot leads digest sent to your Telegram & Email!");
+    } catch {
+      toast.error("Could not complete notifications. Check Settings.");
+    } finally {
+      setNotifying(false);
+    }
+  }
 
   async function runRank() {
     setRunning(true);
@@ -50,8 +102,20 @@ export function Phase3Rank({
       toast.error(res.notInstalled ? "Claude Code required" : "Ranking failed");
       return;
     }
-    setRanked(res.data.ranked);
-    toast.success("Prospects ranked by conversion potential");
+    const rankedList = res.data.ranked;
+    setRanked(rankedList);
+
+    // Auto-select the #1 top prospect
+    if (rankedList.length > 0 && !selectedId) {
+      setSelectedId(rankedList[0].id);
+    }
+
+    // Auto-save all ranked leads to CRM
+    for (const item of rankedList) {
+      addToCRM(item);
+    }
+
+    toast.success("Prospects ranked & saved to CRM!");
   }
 
   // No audits yet → nothing to rank
@@ -94,9 +158,22 @@ export function Phase3Rank({
             ? `${ranked.length} prospects ranked`
             : `${auditedCount} audited lead${auditedCount === 1 ? "" : "s"} ready to rank`}
         </div>
-        <Button onClick={runRank} disabled={running} className="h-10 px-4">
-          {running ? "Ranking…" : ranked.length > 0 ? "Re-rank prospects" : "Rank prospects"}
-        </Button>
+        <div className="flex items-center gap-2">
+          {ranked.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={notifyMe}
+              disabled={notifying}
+              className="h-10 px-3 text-xs gap-1.5 border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10"
+            >
+              <Bell className="h-4 w-4" /> {notifying ? "Sending Alerts…" : "Send to My Email & Telegram"}
+            </Button>
+          )}
+          <Button onClick={runRank} disabled={running} className="h-10 px-4">
+            {running ? "Ranking…" : ranked.length > 0 ? "Re-rank prospects" : "Rank prospects"}
+          </Button>
+        </div>
       </div>
 
       {running && <div className="mb-6"><ClaudeThinking label="Ranking your prospects by conversion opportunity…" /></div>}

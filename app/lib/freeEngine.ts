@@ -586,9 +586,11 @@ export function generateMockLeads(niche: string, city: string, count: number): L
   const hvBusiness = isHighValue(cleanNiche);
   const center = getCityCenter(baseCity);
   const localities = getLocalities(baseCity);
-  const rand = makePRNG(strToSeed(`${cleanNiche}::${baseCity}`));
+  // Randomize seed each call so user gets fresh random results every search
+  const randomSeedStr = `${cleanNiche}::${baseCity}::${Date.now()}::${Math.random()}`;
+  const rand = makePRNG(strToSeed(randomSeedStr));
 
-  // Shuffle pools using seeded PRNG
+  // Shuffle pools using randomized PRNG
   const shuffledPrefixes = shuffled(NAME_PREFIXES, rand);
   const shuffledSuffixes = shuffled(hvBusiness ? NAME_SUFFIXES_CLINIC : NAME_SUFFIXES_GENERIC, rand);
   const shuffledDrNames = shuffled(DR_NAMES, rand);
@@ -603,62 +605,49 @@ export function generateMockLeads(niche: string, city: string, count: number): L
       ? `Dr. ${shuffledDrNames[i % shuffledDrNames.length]}'s ${cleanNiche} ${shuffledSuffixes[i % shuffledSuffixes.length]}`
       : `${shuffledPrefixes[i % shuffledPrefixes.length]} ${cleanNiche} ${shuffledSuffixes[i % shuffledSuffixes.length]}`;
 
-    const hasSite = rand() < 0.35; // ~35% have a website (realistic for Indian local businesses)
-    const hasWhatsapp = rand() < 0.8;
-    const hasEmail = rand() < 0.5;
+    // EVERY lead in Option A has NO WEBSITE (needs a site built) & HAS AN EMAIL
+    const locality = shuffledLocalities[i % shuffledLocalities.length];
+    const shortAddress = `${locality}, ${baseCity}`;
 
-    // Seeded but varied ratings (4.0 – 4.9)
-    const rating = Number((4.0 + rand() * 0.9).toFixed(1));
-    // Seeded but varied review counts (20 – 280)
-    const reviewsCount = Math.floor(20 + rand() * 260);
-    // Years in business (2 – 20)
+    // Seeded but varied ratings (4.1 – 4.9)
+    const rating = Number((4.1 + rand() * 0.8).toFixed(1));
+    const reviewsCount = Math.floor(25 + rand() * 280);
     const yearsInBusiness = Math.floor(2 + rand() * 18);
-    // Photos
     const photosCount = Math.floor(5 + rand() * 40);
 
-    // Lat/lng offset around city center
-    const latOffset = (rand() - 0.5) * 0.04;
-    const lngOffset = (rand() - 0.5) * 0.04;
-
-    const locality = shuffledLocalities[i % shuffledLocalities.length];
-    const areaStr = `${locality}, ${baseCity}`;
+    const latOffset = (rand() - 0.5) * 0.03;
+    const lngOffset = (rand() - 0.5) * 0.03;
 
     const phoneNum = `+91 9${Math.floor(rand() * 9)}${Math.floor(10000000 + rand() * 89999999)}`;
     const nameSlug = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const email = `${nameSlug.slice(0, 18)}@gmail.com`;
 
-    // Estimate revenue for prioritisation
     const estMonthlyRevenue = estimateMonthlyRevenue(cleanNiche, reviewsCount, rating);
 
     leads.push({
       id: `lead-${String(i + 1).padStart(2, "0")}`,
       name,
       category: cleanNiche,
-      address: areaStr,
+      address: shortAddress,
       city: baseCity,
       phone: phoneNum,
-      whatsapp: hasWhatsapp ? phoneNum : undefined,
-      email: hasEmail ? `${nameSlug}@gmail.com` : undefined,
-      website: hasSite ? `https://${nameSlug}.in` : undefined,
+      whatsapp: phoneNum,
+      email,
+      website: undefined, // NO WEBSITE (High priority target)
       rating,
       reviewsCount,
       lat: Number((center.lat + latOffset).toFixed(6)),
       lng: Number((center.lng + lngOffset).toFixed(6)),
       photosCount,
       yearsInBusiness,
-      highValue: hvBusiness && (reviewsCount > 80 || rating >= 4.6), // Mark as high-value if metrics are strong
+      highValue: true,
       estMonthlyRevenue,
     });
   }
 
-  // Sort: high-value leads first (most profitable clients at the top)
-  leads.sort((a, b) => {
-    if (a.highValue && !b.highValue) return -1;
-    if (!a.highValue && b.highValue) return 1;
-    return (b.estMonthlyRevenue ?? 0) - (a.estMonthlyRevenue ?? 0);
-  });
+  // Shuffle order to give dynamic randomized results
+  const randomizedLeads = shuffled(leads, rand);
+  randomizedLeads.forEach((l, i) => { l.id = `lead-${String(i + 1).padStart(2, "0")}`; });
 
-  // Re-assign IDs after sorting so #1 is always the best lead
-  leads.forEach((l, i) => { l.id = `lead-${String(i + 1).padStart(2, "0")}`; });
-
-  return leads;
+  return randomizedLeads;
 }
