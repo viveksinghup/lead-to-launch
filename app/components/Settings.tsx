@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings as SettingsIcon, Mail, MessageSquare, Send, CheckCircle2, RefreshCw } from "lucide-react";
+import { Settings as SettingsIcon, Mail, MessageSquare, Send, CheckCircle2, RefreshCw, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { sendTelegramMessage } from "@/lib/telegramNotifier";
-import { sendEmailViaEmailJS } from "@/lib/emailNotifier";
+import { sendEmailViaEmailJS, DEFAULT_PITCH_TEMPLATE } from "@/lib/emailNotifier";
 import type { NotificationSettings } from "@/lib/types";
 
 const SETTINGS_KEY = "lead_launch_settings";
@@ -31,6 +32,7 @@ const INITIAL_DEFAULTS: NotificationSettings = {
 export function SettingsModal({ trigger }: { trigger?: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const [settings, setSettings] = useState<NotificationSettings>(INITIAL_DEFAULTS);
+  const [pitchTemplate, setPitchTemplate] = useState("");
   const [testingTelegram, setTestingTelegram] = useState(false);
   const [detectingChatId, setDetectingChatId] = useState(false);
   const [testingEmail, setTestingEmail] = useState(false);
@@ -51,15 +53,18 @@ export function SettingsModal({ trigger }: { trigger?: React.ReactNode }) {
           yourEmail: parsed.yourEmail || INITIAL_DEFAULTS.yourEmail,
           yourName: parsed.yourName || INITIAL_DEFAULTS.yourName,
         }));
+        setPitchTemplate(parsed.pitchTemplate || DEFAULT_PITCH_TEMPLATE);
+      } else {
+        setPitchTemplate(DEFAULT_PITCH_TEMPLATE);
       }
     } catch {
-      // ignore
+      setPitchTemplate(DEFAULT_PITCH_TEMPLATE);
     }
   }, [open]);
 
   function saveSettings() {
     if (typeof window === "undefined") return;
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...settings, pitchTemplate }));
     toast.success("Settings saved successfully!");
     setOpen(false);
   }
@@ -157,10 +162,11 @@ export function SettingsModal({ trigger }: { trigger?: React.ReactNode }) {
         </DialogHeader>
 
         <Tabs defaultValue="notifications" className="w-full mt-2">
-          <TabsList className="grid grid-cols-3 mb-4">
+          <TabsList className="grid grid-cols-4 mb-4">
             <TabsTrigger value="notifications" className="text-xs">Email & Telegram</TabsTrigger>
             <TabsTrigger value="profile" className="text-xs">Profile & Defaults</TabsTrigger>
             <TabsTrigger value="api-keys" className="text-xs">API Keys</TabsTrigger>
+            <TabsTrigger value="pitch" className="text-xs">Pitch Template</TabsTrigger>
           </TabsList>
 
           {/* TAB 1: Notifications */}
@@ -344,6 +350,52 @@ export function SettingsModal({ trigger }: { trigger?: React.ReactNode }) {
                 <div className="text-slate-600 text-[11px] mt-0.5">
                   Your SerpAPI, Gemini 3.7 Flash AI, and EmailJS backend configurations are active in <code>.env.local</code>.
                 </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* TAB 4: Pitch Template */}
+          <TabsContent value="pitch" className="space-y-4">
+            <div className="rounded-lg border p-3.5 space-y-3 bg-muted/20">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-7 h-7 rounded-md bg-purple-500/10 text-purple-500 flex items-center justify-center">
+                  <FileText className="h-4 w-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-semibold">Email Pitch Template</div>
+                  <div className="text-[10px] text-muted-foreground">Customize the outreach email sent to your leads</div>
+                </div>
+              </div>
+
+              <div className="rounded-lg bg-purple-500/10 border border-purple-500/20 px-3 py-2 text-[11px] text-purple-700">
+                <strong>Available Variables:</strong>{" "}
+                <code className="bg-purple-200/40 px-1 rounded">&#123;&#123;leadName&#125;&#125;</code>{" "}
+                <code className="bg-purple-200/40 px-1 rounded">&#123;&#123;leadCity&#125;&#125;</code>{" "}
+                <code className="bg-purple-200/40 px-1 rounded">&#123;&#123;category&#125;&#125;</code>{" "}
+                <code className="bg-purple-200/40 px-1 rounded">&#123;&#123;demoUrl&#125;&#125;</code>{" "}
+                <code className="bg-purple-200/40 px-1 rounded">&#123;&#123;yourName&#125;&#125;</code>
+              </div>
+
+              <Textarea
+                value={pitchTemplate}
+                onChange={(e) => setPitchTemplate(e.target.value)}
+                placeholder={DEFAULT_PITCH_TEMPLATE}
+                className="min-h-[280px] text-xs font-mono leading-relaxed"
+              />
+
+              <div className="flex justify-between items-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setPitchTemplate(DEFAULT_PITCH_TEMPLATE);
+                    toast.success("Reset to default template");
+                  }}
+                  className="h-7 text-xs text-muted-foreground"
+                >
+                  Reset to Default
+                </Button>
+                <p className="text-[10px] text-muted-foreground">Changes apply to all future emails sent from CRM and Phase 5</p>
               </div>
             </div>
           </TabsContent>

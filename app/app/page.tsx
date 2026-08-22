@@ -51,7 +51,7 @@ export default function Page() {
       >
         Skip to content
       </a>
-      <header className="border-b border-border bg-background/80 backdrop-blur sticky top-0 z-30">
+      <header className="bg-background/80 backdrop-blur sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-md bg-primary flex items-center justify-center">
@@ -83,7 +83,7 @@ export default function Page() {
         </div>
         <Stepper current={phase} completed={completed} onJump={(n) => setPhase(n)} />
       </header>
-      <main id="main" className="pt-6" tabIndex={-1}>
+      <main id="main" className="pt-2" tabIndex={-1}>
         {phase === 1 && (
           <Phase1Scrape
             key="p1"

@@ -34,6 +34,58 @@ export const DEFAULT_EMAIL_CONFIG = {
   yourName: "Vik",
 };
 
+/** Default pitch email template sent to leads.
+ *  Supports variables: {{leadName}}, {{leadCity}}, {{category}}, {{demoUrl}}, {{yourName}}
+ */
+export const DEFAULT_PITCH_TEMPLATE = `Hi {{leadName}},
+
+I came across your business in {{leadCity}} and noticed you might benefit from a modern, professional website to attract more customers and grow online.
+
+I've already built a custom website demo tailored specifically for your {{category}} business — it's fast, mobile-friendly, and ready to go live.
+
+🔗 View your free demo here: {{demoUrl}}
+
+Here's what's included:
+• Fast-loading, mobile-first design
+• WhatsApp/Email contact form integration
+• Google Maps & Google SEO optimization
+• Ready to launch within 24 hours
+
+I'd love to help you get more leads online. Would you be open to a quick 10-minute chat?
+
+Best regards,
+{{yourName}}`;
+
+/** Load the pitch template from localStorage (user-editable) or return default */
+export function getPitchTemplate(data: {
+  leadName?: string;
+  leadCity?: string;
+  category?: string;
+  demoUrl?: string;
+  yourName?: string;
+}): string {
+  let template = DEFAULT_PITCH_TEMPLATE;
+
+  if (typeof window !== "undefined") {
+    try {
+      const raw = localStorage.getItem("lead_launch_settings");
+      const s = raw ? JSON.parse(raw) : {};
+      if (s.pitchTemplate && typeof s.pitchTemplate === "string" && s.pitchTemplate.trim()) {
+        template = s.pitchTemplate;
+      }
+    } catch {
+      // use default
+    }
+  }
+
+  return template
+    .replace(/\{\{leadName\}\}/g, data.leadName || "there")
+    .replace(/\{\{leadCity\}\}/g, data.leadCity || "your city")
+    .replace(/\{\{category\}\}/g, data.category || "business")
+    .replace(/\{\{demoUrl\}\}/g, data.demoUrl || "http://localhost:3000")
+    .replace(/\{\{yourName\}\}/g, data.yourName || "Vik");
+}
+
 /** Load EmailJS / profile settings from localStorage or defaults */
 export function getEmailConfig() {
   if (typeof window === "undefined") {

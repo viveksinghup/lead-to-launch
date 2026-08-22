@@ -301,16 +301,51 @@ export function Phase1Scrape({
                   {leads.map((l, i) => (
                     <TableRow key={l.id} className={`border-b border-border/60 animate-in fade-in duration-200 ${l.highValue ? "bg-purple-500/5" : ""}`}>
                       <TableCell className="text-muted-foreground text-xs">{i + 1}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1.5">
+                      <TableCell className="relative group max-w-[280px]">
+                        <div className="flex items-center gap-1.5 cursor-pointer">
                           {l.highValue && (
                             <Crown className="h-3.5 w-3.5 text-amber-500 shrink-0" aria-label="Priority Lead" />
                           )}
-                          <div>
-                            <div className="font-medium text-xs line-clamp-1">{l.name}</div>
-                            <div className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                              <MapPin className="h-3 w-3 shrink-0" /> <span className="truncate max-w-[180px]">{l.address}</span>
+                          <div className="min-w-0">
+                            <div className="font-medium text-xs truncate max-w-[240px] group-hover:text-primary transition-colors">
+                              {l.name}
                             </div>
+                            <div className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                              <MapPin className="h-3 w-3 shrink-0 text-muted-foreground/70" />
+                              <span className="truncate max-w-[220px]">{l.address}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Rich Hover Context Tooltip */}
+                        <div className="pointer-events-none opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 absolute left-8 top-8 z-50 w-84 max-w-[340px] p-3 bg-popover text-popover-foreground rounded-xl border border-border/80 shadow-2xl backdrop-blur-md space-y-2">
+                          <div className="flex items-center justify-between gap-1 border-b border-border/60 pb-1.5">
+                            <Badge variant="outline" className="text-[10px] font-bold tracking-wider text-purple-600 bg-purple-500/10 border-purple-500/30">
+                              {l.category}
+                            </Badge>
+                            <span className="text-[10px] font-medium text-muted-foreground">{l.city || "Global"}</span>
+                          </div>
+                          
+                          <div>
+                            <div className="text-xs font-bold text-foreground leading-snug">
+                              {l.name}
+                            </div>
+                            <p className="text-[11px] text-muted-foreground leading-relaxed mt-1 bg-muted/40 p-2 rounded-md font-sans select-text">
+                              {l.address || "No additional description text provided."}
+                            </p>
+                          </div>
+
+                          <div className="pt-1 flex items-center justify-between gap-2 text-[10px] border-t border-border/40">
+                            {l.email && (
+                              <span className="text-blue-500 font-mono font-medium truncate">
+                                ✉️ {l.email}
+                              </span>
+                            )}
+                            {l.website && (
+                              <span className="text-primary flex items-center gap-1 font-medium ml-auto">
+                                <ExternalLink className="h-3 w-3" /> View Post
+                              </span>
+                            )}
                           </div>
                         </div>
                       </TableCell>

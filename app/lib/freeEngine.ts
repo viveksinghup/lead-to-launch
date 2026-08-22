@@ -17,7 +17,9 @@ function strToSeed(s: string): number {
     h = ((h << 5) + h) ^ s.charCodeAt(i);
     h = h >>> 0; // keep 32-bit unsigned
   }
-  return h || 1;
+  // XOR with the current minute-bucket so results change on every new search
+  const minuteBucket = Math.floor(Date.now() / 60000);
+  return (h ^ minuteBucket) || 1;
 }
 
 /** Linear congruential generator — returns a fn that yields [0, 1) floats */

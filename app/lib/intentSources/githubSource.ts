@@ -19,16 +19,18 @@ interface GitHubSearchResponse {
 }
 
 export async function searchGitHubIssues(nicheQuery?: string, limit = 15): Promise<IntentLead[]> {
-  const query = `("need website" OR "website developer needed" OR "looking for web developer" OR "need landing page") is:issue is:open`;
+  const query = `("need website" OR "website developer needed" OR "looking for web developer" OR "need landing page" OR "hire freelance developer" OR "need web design") is:issue is:open`;
+  const sortOrders = ["created", "updated", "reactions"];
+  const sort = sortOrders[Math.floor(Date.now() / 60000) % sortOrders.length];
 
   try {
-    const url = `https://api.github.com/search/issues?q=${encodeURIComponent(query)}&sort=created&order=desc&per_page=25`;
+    const url = `https://api.github.com/search/issues?q=${encodeURIComponent(query)}&sort=${sort}&order=desc&per_page=25`;
     const res = await fetch(url, {
       headers: {
         Accept: "application/vnd.github.v3+json",
         "User-Agent": "LeadToLaunch-App",
       },
-      next: { revalidate: 1800 },
+      cache: "no-store",
     });
 
     if (!res.ok) return [];

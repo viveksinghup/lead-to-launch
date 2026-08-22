@@ -1,5 +1,6 @@
 import type { IntentLead } from "../types";
-import { extractPrimaryEmail } from "./contactExtractor";
+import { extractPrimaryEmail, extractEmailsFromText } from "./contactExtractor";
+import { classifyAndFilterFreelanceProject } from "../intentClassifier";
 
 interface HNHit {
   objectID: string;
@@ -29,10 +30,15 @@ function cleanHtml(html: string): string {
     .trim();
 }
 
+/**
+ * HackerNews Freelance Client Query
+ * Targets the official monthly "Seeking Freelancer" threads and client project posts with direct email.
+ */
 export async function searchHackerNews(nicheQuery?: string, limit = 15): Promise<IntentLead[]> {
   const queryTerms = [
-    `"need website" OR "looking for developer" OR "hiring web developer"`,
-    `"need a web developer" OR "need landing page" OR "website redesign"`,
+    `"Seeking Freelancer" OR "Seeking freelance" OR "hiring freelance web"`,
+    `"need a web developer" OR "looking to hire web" OR "freelance web developer needed"`,
+    `"Ask HN: Freelancer? Seeking Freelancer"`,
   ];
 
   const results: IntentLead[] = [];
@@ -43,7 +49,8 @@ export async function searchHackerNews(nicheQuery?: string, limit = 15): Promise
       const url = `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(q)}&hitsPerPage=25`;
       const res = await fetch(url, {
         headers: { Accept: "application/json", "User-Agent": "LeadToLaunch/1.0" },
-        next: { revalidate: 1800 },
+        cache: "no-store",
+        signal: AbortSignal.timeout(2200),
       });
       if (!res.ok) continue;
 
@@ -53,27 +60,35 @@ export async function searchHackerNews(nicheQuery?: string, limit = 15): Promise
       for (const h of hits) {
         if (!h.author || h.author === "[deleted]") continue;
         const text = cleanHtml(h.comment_text || h.story_text || h.title || h.story_title || "");
-        const email = extractPrimaryEmail(text);
+        const rawTitle = h.title || h.story_title || (text.slice(0, 60) + "…");
 
-        const title = h.title || h.story_title || (text.slice(0, 60) + "…");
+        // Apply strict freelance classifier (rejects corporate jobs and seller ads)
+        const classified = classifyAndFilterFreelanceProject(rawTitle, text);
+        if (!classified.isValid) continue;
+
+        const emails = extractEmailsFromText(text);
+        const email = emails[0] || extractPrimaryEmail(text);
+
         const postUrl = h.url || `https://news.ycombinator.com/item?id=${h.objectID}`;
 
         if (!seen.has(h.objectID) && !seen.has(postUrl)) {
           seen.add(h.objectID);
           seen.add(postUrl);
 
+          const budgetTag = classified.budget ? ` · Budget: ${classified.budget}` : "";
+
           results.push({
             id: `hn-${h.objectID}`,
-            platform: "linkedin", // mapped for UI
-            authorName: h.author,
+            platform: "linkedin",
+            authorName: `@${h.author} (HN Founder)`,
             authorHandle: `@${h.author}`,
-            postTitle: `HN Founder: ${title}`,
-            postSnippet: text.slice(0, 220) + (text.length > 220 ? "…" : ""),
+            postTitle: `🚀 HN: ${rawTitle.slice(0, 65)}`,
+            postSnippet: `${text.slice(0, 200)}${budgetTag}`,
             postUrl,
             postedAt: h.created_at || new Date().toISOString(),
-            intentScore: email ? 90 : 75,
-            keywords: ["hacker news startup founder"],
-            contactHint: email,
+            intentScore: classified.score,
+            keywords: ["hacker news client project", classified.category],
+            contactHint: email || postUrl,
             location: "Global / Silicon Valley / Remote",
           });
         }

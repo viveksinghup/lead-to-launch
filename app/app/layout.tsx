@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Toaster } from "@/components/ui/sonner";
+import { AuthGuard } from "@/components/AuthGuard";
 import "./globals.css";
 
 // Fonts are provided via CSS variables (--font-sans / --font-display / --font-mono)
@@ -14,7 +16,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" className="h-full antialiased">
       <head>
-        <script
+        <Script
+          id="sw-unregister"
+          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `
               if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
@@ -29,7 +33,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         />
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
-        {children}
+        <AuthGuard>
+          {children}
+        </AuthGuard>
         <Toaster position="bottom-right" />
       </body>
     </html>
